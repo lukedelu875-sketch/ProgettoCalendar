@@ -1,0 +1,6 @@
+# Facoltativi: servono solo per l'OCR sul computer (gli screenshot si leggono già nel browser).
+# Si installano uno alla volta con installa-opzionali.bat: se uno non esiste per la tua versione
+# di Python, gli altri funzionano lo stesso.
+pillow
+pytesseract      # serve anche il programma Tesseract per Windows (lingua Italian)
+pymupdf          # PDF scansionati

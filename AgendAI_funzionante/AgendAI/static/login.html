@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Accedi · Agenda</title>
+<meta name="theme-color" content="#17243A">
+<script>
+  try {
+    document.documentElement.dataset.theme = localStorage.getItem('agenda-theme')
+      || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  } catch (e) {}
+</script>
+<link rel="icon" href="/static/icon.svg" type="image/svg+xml">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<form class="login" method="post" action="/login">
+  <h1><span class="mark">Agenda</span></h1>
+  <label>Password
+    <input type="password" name="password" autocomplete="current-password" required autofocus>
+  </label>
+  <p class="msg" id="msg" role="alert"></p>
+  <button class="btn primary" type="submit">Entra</button>
+</form>
+<script>
+  const e = new URLSearchParams(location.search).get('e');
+  if (e === '1') document.getElementById('msg').textContent = 'Password non corretta.';
+  if (e === '2') document.getElementById('msg').textContent = 'Troppi tentativi. Riprova tra qualche minuto.';
+</script>
+</body>
+</html>

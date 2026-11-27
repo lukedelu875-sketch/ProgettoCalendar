@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Agenda</title>
+<meta name="theme-color" content="#17243A">
+<script>
+  // Applica il tema salvato prima del disegno, per evitare il lampo di colore sbagliato.
+  try {
+    document.documentElement.dataset.theme = localStorage.getItem('agenda-theme')
+      || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  } catch (e) {}
+</script>
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" href="/static/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/static/icon-180.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Agenda">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div>
+      <h1 class="today"><span class="mark" id="todayLabel"></span></h1>
+      <p class="sub" id="statusLine"></p>
+    </div>
+    <div class="top-actions">
+      <button class="ghost" id="btnCheck" type="button">Controlla posta</button>
+      <button class="ghost round" id="btnSettings" type="button" aria-label="Impostazioni">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main>
+    <section id="view-cal">
+      <div class="monthbar">
+        <button class="nav" id="prev" type="button" aria-label="Mese precedente">‹</button>
+        <h2 id="monthTitle"></h2>
+        <button class="nav" id="next" type="button" aria-label="Mese successivo">›</button>
+      </div>
+      <div class="week" aria-hidden="true"><span>lun</span><span>mar</span><span>mer</span><span>gio</span><span>ven</span><span>sab</span><span>dom</span></div>
+      <div class="grid" id="grid"></div>
+      <div class="list" id="dayList"></div>
+    </section>
+    <section id="view-next" hidden><div class="list" id="nextList"></div></section>
+    <section id="view-pending" hidden><div class="list" id="pendingList"></div></section>
+  </main>
+  <form method="post" action="/logout" class="logout"><button class="ghost" type="submit">Esci</button></form>
+</div>
+
+<button class="themebtn" id="btnTheme" type="button" aria-label="Passa al tema scuro">
+  <svg class="i-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+  <svg class="i-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+</button>
+<button class="fab" id="fab" type="button" aria-label="Nuovo impegno">+</button>
+
+<nav class="tabs" aria-label="Sezioni"><div class="tabs-inner">
+  <button type="button" data-view="cal" aria-current="page">Calendario</button>
+  <button type="button" data-view="next">Prossimi</button>
+  <button type="button" data-view="pending">Da confermare<span class="badge" id="badge" hidden></span></button>
+</div></nav>
+
+<dialog id="dlg">
+  <form id="form" method="dialog">
+    <h2 id="dlgTitle">Nuovo impegno</h2>
+    <label>Titolo <input type="text" id="f-title" maxlength="120" required></label>
+    <div class="row">
+      <label>Data <input type="date" id="f-date" required></label>
+      <label>Fino al <input type="date" id="f-end-date"></label>
+    </div>
+    <div class="row">
+      <label>Ora di inizio <input type="time" id="f-time"></label>
+      <label>Ora di fine <input type="time" id="f-end-time"></label>
+    </div>
+    <p class="hint">Senza ora di inizio l’impegno dura tutto il giorno.</p>
+    <label>Luogo <input type="text" id="f-location" maxlength="200"></label>
+    <label>Note <textarea id="f-summary" rows="3"></textarea></label>
+    <p class="msg" id="formMsg" role="alert"></p>
+    <div class="actions">
+      <button class="btn primary" type="submit" id="btnSave">Salva impegno</button>
+      <button class="btn" type="button" id="btnCancel">Annulla</button>
+      <button class="btn danger" type="button" id="btnDelete" hidden>Elimina</button>
+    </div>
+    <div id="pdfBox">
+      <hr class="sep">
+      <label>Oppure analizza un PDF o uno screenshot (circolari, chat, inviti)
+        <input type="file" id="f-pdf" accept="application/pdf,image/*,.pdf,.png,.jpg,.jpeg,.webp,.heic,.heif" multiple>
+      </label>
+      <p class="hint" id="pdfMsg">Gli impegni trovati arrivano in “Da confermare” per un controllo. Su computer puoi incollare uno screenshot con Ctrl+V.</p>
+      <div class="actions">
+        <button class="btn" type="button" id="btnPdf">Analizza con AI</button>
+        <button class="btn" type="button" id="btnOcr" title="Legge i file sul computer che ospita l’agenda, senza mandarli a nessun servizio">Solo OCR (senza AI)</button>
+      </div>
+      <p class="hint">Se Gemini ha finito la quota, “Analizza con AI” passa da solo all’AI di riserva o all’OCR. “Solo OCR” non manda nulla all’esterno, ma capisce meno.</p>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlgDays" aria-labelledby="daysTitle">
+  <form id="daysForm" class="sheet" method="dialog">
+    <h2 id="daysTitle">Scegli i giorni</h2>
+    <p class="hint" id="daysInfo"></p>
+    <div class="week" aria-hidden="true"><span>lun</span><span>mar</span><span>mer</span><span>gio</span><span>ven</span><span>sab</span><span>dom</span></div>
+    <div class="grid" id="daysGrid"></div>
+    <p class="hint" id="daysCount" role="status"></p>
+    <p class="msg" id="daysMsg" role="alert"></p>
+    <div class="actions">
+      <button class="btn primary" type="submit" id="btnDaysSave" disabled>Aggiungi i giorni scelti</button>
+      <button class="btn" type="button" id="btnDaysAll">Tutti</button>
+      <button class="btn" type="button" id="btnDaysNone">Nessuno</button>
+      <button class="btn" type="button" id="btnDaysCancel">Annulla</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="dlgSettings" aria-labelledby="sTitle">
+  <div class="sheet">
+    <h2 id="sTitle">Impostazioni</h2>
+
+    <section aria-labelledby="gTitle">
+      <h3 id="gTitle">Chiave Gemini</h3>
+      <p class="hint" id="gStatus"></p>
+      <form class="sform" id="geminiForm" autocomplete="off">
+        <label>Chiave API
+          <input type="password" id="g-key" autocomplete="off" spellcheck="false" autocapitalize="off">
+        </label>
+        <label>Modello <span class="hint">(lascia vuoto per usare quello predefinito)</span>
+          <input type="text" id="g-model" autocomplete="off" spellcheck="false" autocapitalize="off">
+        </label>
+        <p class="hint">La chiave si crea gratis su Google AI Studio. Viene provata prima di essere salvata e non torna mai visibile qui: vedrai solo le ultime 4 cifre.</p>
+        <p class="msg" id="gMsg" role="status"></p>
+        <div class="actions">
+          <button class="btn primary" type="submit" id="gSave">Verifica e salva</button>
+          <button class="btn danger" type="button" id="gRemove" hidden>Rimuovi chiave</button>
+        </div>
+      </form>
+    </section>
+
+    <section aria-labelledby="dTitle">
+      <h3 id="dTitle">Se qualcosa non funziona</h3>
+      <p class="hint">Prova una per una le cose che servono (chiave Gemini, posta, lettura dei file) e dice cosa sistemare.</p>
+      <ul class="diag" id="diagList"></ul>
+      <p class="msg" id="diagMsg" role="status"></p>
+      <button class="btn" type="button" id="btnDiag">Controlla che tutto funzioni</button>
+    </section>
+
+    <section aria-labelledby="fTitle">
+      <h3 id="fTitle">AI di riserva</h3>
+      <p class="hint" id="fStatus"></p>
+      <form class="sform" id="fallbackForm" autocomplete="off">
+        <label>Servizio
+          <select id="fb-preset">
+            <option value="">— scegli —</option>
+            <option value="groq">Groq (gratuito con limiti)</option>
+            <option value="mistral">Mistral (piano gratuito con limiti)</option>
+            <option value="openrouter">OpenRouter (modelli gratuiti)</option>
+            <option value="ollama">Ollama (sul tuo computer, senza limiti)</option>
+            <option value="other">Altro (compatibile con OpenAI)</option>
+          </select>
+        </label>
+        <label>Indirizzo del servizio
+          <input type="text" id="fb-url" autocomplete="off" spellcheck="false" autocapitalize="off" placeholder="https://…/v1">
+        </label>
+        <label>Chiave API <span class="hint">(per Ollama lascia vuoto)</span>
+          <input type="password" id="fb-key" autocomplete="off" spellcheck="false" autocapitalize="off">
+        </label>
+        <label>Modello
+          <input type="text" id="fb-model" autocomplete="off" spellcheck="false" autocapitalize="off">
+        </label>
+        <p class="hint" id="fbHint">Si usa quando Gemini ha finito la quota. Il testo di mail, PDF e screenshot (già letto dall’OCR) viene mandato a questo servizio: scegline uno di cui ti fidi. I nomi dei modelli cambiano spesso: copia quello aggiornato dal sito del servizio.</p>
+        <p class="hint" id="ocrStatus"></p>
+        <p class="msg" id="fbMsg" role="status"></p>
+        <div class="actions">
+          <button class="btn primary" type="submit" id="fbSave">Verifica e salva</button>
+          <button class="btn danger" type="button" id="fbRemove" hidden>Rimuovi</button>
+        </div>
+      </form>
+    </section>
+
+    <section aria-labelledby="aTitle">
+      <h3 id="aTitle">Account di posta</h3>
+      <div class="acct-list" id="acctList"></div>
+      <p class="msg" id="aMsg" role="status"></p>
+      <details class="add" id="addBox">
+        <summary>Aggiungi un account</summary>
+        <form class="sform" id="acctForm" autocomplete="off">
+          <label>Nome <span class="hint">(facoltativo, es. “Scuola”)</span>
+            <input type="text" id="a-label" maxlength="60" autocomplete="off">
+          </label>
+          <label>Indirizzo email
+            <input type="email" id="a-email" required autocomplete="off" autocapitalize="off" spellcheck="false">
+          </label>
+          <label>Password per app
+            <input type="password" id="a-pass" required autocomplete="new-password">
+          </label>
+          <label>Server IMAP
+            <input type="text" id="a-server" value="imap.gmail.com" required autocapitalize="off" spellcheck="false">
+          </label>
+          <p class="hint">Per Gmail serve una “password per le app”: si crea dall’account Google, in Sicurezza, con la verifica in due passaggi attiva. Le mail non vengono segnate come lette.</p>
+          <p class="msg" id="aFormMsg" role="alert"></p>
+          <div><button class="btn primary" type="submit" id="aSave">Prova e aggiungi</button></div>
+        </form>
+      </details>
+    </section>
+
+    <div class="actions"><button class="btn" type="button" id="sClose">Chiudi</button></div>
+  </div>
+</dialog>
+
+<div id="toast" role="status"></div>
+<script src="/static/app.js" defer></script>
+</body>
+</html>
